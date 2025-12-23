@@ -1,11 +1,11 @@
 /**
  * Homestay Model
  *
- * Defines the Homestay entity structure and provides in-memory storage.
+ * Defines the Homestay entity structure using Mongoose ODM.
  * Homestays represent accommodation listings available for booking.
  */
 
-import { Location } from '../../types/api.types';
+import mongoose, { Schema, Document, Model } from 'mongoose';
 
 /**
  * Property type options for homestays.
@@ -43,14 +43,26 @@ export interface HomestayCapacity {
 }
 
 /**
+ * Location structure for homestays.
+ */
+export interface HomestayLocation {
+	address: string;
+	district: string;
+	state: string;
+	coordinates?: {
+		lat: number;
+		lng: number;
+	};
+}
+
+/**
  * Complete Homestay entity interface.
  */
-export interface Homestay {
-	_id: string;
+export interface IHomestay {
 	title: string;
 	description: string;
 	propertyType: PropertyType;
-	location: Location;
+	location: HomestayLocation;
 	pricing: HomestayPricing;
 	capacity: HomestayCapacity;
 	amenities: string[];
@@ -62,19 +74,132 @@ export interface Homestay {
 }
 
 /**
+ * Homestay document type (includes Mongoose Document properties).
+ */
+export interface IHomestayDocument extends IHomestay, Document {}
+
+/**
  * Input type for creating a new homestay.
  * Excludes auto-generated fields.
  */
-export type CreateHomestayInput = Omit<Homestay, '_id' | 'status' | 'createdAt' | 'updatedAt'>;
+export type CreateHomestayInput = Omit<IHomestay, 'status' | 'createdAt' | 'updatedAt'>;
 
 /**
  * Input type for updating a homestay.
  * All fields are optional.
  */
-export type UpdateHomestayInput = Partial<Omit<Homestay, '_id' | 'createdAt' | 'updatedAt'>>;
+export type UpdateHomestayInput = Partial<Omit<IHomestay, 'createdAt' | 'updatedAt'>>;
+
+// ============================================================================
+// Mongoose Schemas
+// ============================================================================
 
 /**
- * In-memory storage for homestays.
- * In production, this would be replaced by a database.
+ * Coordinates subdocument schema.
  */
-export const homestaysStore: Homestay[] = [];
+const coordinatesSchema = new Schema({
+	lat: { type: Number, required: true },
+	lng: { type: Number, required: true }
+}, { _id: false });
+
+/**
+ * Location subdocument schema.
+ */
+const locationSchema = new Schema({
+	address: { type: String, required: true },
+	district: { type: String, required: true },
+	state: { type: String, required: true, default: 'Jharkhand' },
+	coordinates: { type: coordinatesSchema, required: false }
+}, { _id: false });
+
+/**
+ * Pricing subdocument schema.
+ */
+const pricingSchema = new Schema({
+	basePrice: { type: Number, required: true, min: 100 },
+	cleaningFee: { type: Number, required: false },
+	weekendPrice: { type: Number, required: false }
+}, { _id: false });
+
+/**
+ * Capacity subdocument schema.
+ */
+const capacitySchema = new Schema({
+	guests: { type: Number, required: true, min: 1 },
+	bedrooms: { type: Number, required: true, min: 0 },
+	beds: { type: Number, required: true, min: 1 },
+	bathrooms: { type: Number, required: true, min: 0 }
+}, { _id: false });
+
+/**
+ * Main Homestay schema.
+ */
+const homestaySchema = new Schema<IHomestayDocument>({
+	title: {
+		type: String,
+		required: [true, 'Title is required'],
+		trim: true,
+		maxlength: 200
+	},
+	description: {
+		type: String,
+		required: [true, 'Description is required'],
+		trim: true
+	},
+	propertyType: {
+		type: String,
+		enum: ['entire', 'private', 'shared'],
+		required: true,
+		default: 'entire'
+	},
+	location: {
+		type: locationSchema,
+		required: true
+	},
+	pricing: {
+		type: pricingSchema,
+		required: true
+	},
+	capacity: {
+		type: capacitySchema,
+		required: true
+	},
+	amenities: {
+		type: [String],
+		default: []
+	},
+	houseRules: {
+		type: [String],
+		required: false
+	},
+	images: {
+		type: [String],
+		default: []
+	},
+	status: {
+		type: String,
+		enum: ['active', 'inactive', 'pending'],
+		default: 'active'
+	}
+}, {
+	timestamps: true, // Automatically manages createdAt and updatedAt
+	collection: 'homestays'
+});
+
+// ============================================================================
+// Indexes
+// ============================================================================
+
+homestaySchema.index({ 'location.district': 1 });
+homestaySchema.index({ 'pricing.basePrice': 1 });
+homestaySchema.index({ status: 1 });
+homestaySchema.index({ title: 'text', description: 'text' }); // Text search index
+
+// ============================================================================
+// Model Export
+// ============================================================================
+
+/**
+ * Homestay Mongoose model.
+ */
+export const HomestayModel: Model<IHomestayDocument> = mongoose.model<IHomestayDocument>('Homestay', homestaySchema);
