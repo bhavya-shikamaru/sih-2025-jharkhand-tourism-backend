@@ -11,7 +11,7 @@
     },
     {
       "file": "src/config/database.ts",
-      "line": 10,
+      "line": 63,
       "title": "Connection Function",
       "description": "## The connectDB Function\n\n```typescript\nexport async function connectDB(): Promise<void> {\n  const uri = process.env.MONGO_URI;\n  await mongoose.connect(uri);\n}\n```\n\n### Key Points:\n- Uses `async/await` for clean Promise handling\n- Connection string from environment variable\n- Throws error if connection fails\n\n**Never hardcode connection strings!**"
     },
